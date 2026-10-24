@@ -12,6 +12,6 @@ class Settings(BaseSettings):
     BETA_URL: str = "http://localhost:8002"
     SERVICE_URL: str = "http://localhost:8000"
     SEND_TIMEOUT: float = 5
-
+    WATCHDOG_INTERVAL: float = 2
 
 settings = Settings()
