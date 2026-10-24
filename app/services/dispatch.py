@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -9,6 +10,8 @@ from app.config import settings
 from app.db import SessionLocal
 from app.models import Attempt, LedgerEntry, Leg, Task
 from app.services import ledger
+
+logger = logging.getLogger(__name__)
 
 PROVIDER_URLS = {"alpha": settings.ALPHA_URL, "beta": settings.BETA_URL}
 
@@ -77,12 +80,13 @@ async def send_once(attempt_id: uuid.UUID) -> uuid.UUID | None:
         attempt = await session.get(Attempt, attempt_id)
         task = await session.get(Task, attempt.task_id)
         task_id = task.id
-        url = f"{PROVIDER_URLS[attempt.provider]}/tasks"
+        provider = attempt.provider
+        url = f"{PROVIDER_URLS[provider]}/tasks"
         payload = {
             "attempt_id": str(attempt.id),
             "prompt": task.prompt,
             "ref_images": task.ref_images,
-            "callback_url": f"{settings.SERVICE_URL}/webhooks/providers/{attempt.provider}",
+            "callback_url": f"{settings.SERVICE_URL}/webhooks/providers/{provider}",
         }
 
     external_id, error = None, None
@@ -93,8 +97,10 @@ async def send_once(attempt_id: uuid.UUID) -> uuid.UUID | None:
             external_id = resp.json()["external_id"]
         else:
             error = "sync_error"
-    except httpx.HTTPError:
+            logger.warning("provider %s returned %s: %s", provider, resp.status_code, resp.text[:200])
+    except httpx.HTTPError as e:
         error = "sync_error"
+        logger.warning("provider %s request failed: %r", provider, e)
 
     async with SessionLocal() as session, session.begin():
         task = await lock_task(session, task_id)
