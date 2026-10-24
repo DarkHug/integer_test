@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     PROVIDER_TIMEOUT: int = 60
     ALPHA_URL: str = "http://localhost:8001"
     BETA_URL: str = "http://localhost:8002"
+    SERVICE_URL: str = "http://localhost:8000"
+    SEND_TIMEOUT: float = 5
 
 
 settings = Settings()
