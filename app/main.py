@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
-from app.api import generate, payments, provider_webhooks
+from app.api import generate, payments, provider_webhooks, read
 from app.services import watchdog
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -23,6 +23,7 @@ app = FastAPI(title="Generation service", lifespan=lifespan)
 app.include_router(payments.router)
 app.include_router(generate.router)
 app.include_router(provider_webhooks.router)
+app.include_router(read.router)
 
 
 @app.get("/health")

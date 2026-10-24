@@ -75,6 +75,20 @@ async def fail_and_advance(
     return None
 
 
+async def post_to_provider(provider: str, url: str, payload: dict) -> tuple[str | None, str | None]:
+    """Возвращает (external_id, None) при успехе или (None, тип_ошибки)."""
+    try:
+        async with httpx.AsyncClient(timeout=settings.SEND_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+    except httpx.HTTPError as e:
+        logger.warning("provider %s request failed: %r", provider, e)
+        return None, "sync_error"
+    if resp.status_code != 202:
+        logger.warning("provider %s returned %s: %s", provider, resp.status_code, resp.text[:200])
+        return None, "sync_error"
+    return resp.json()["external_id"], None
+
+
 async def send_once(attempt_id: uuid.UUID) -> uuid.UUID | None:
     async with SessionLocal() as session:
         attempt = await session.get(Attempt, attempt_id)
@@ -89,18 +103,7 @@ async def send_once(attempt_id: uuid.UUID) -> uuid.UUID | None:
             "callback_url": f"{settings.SERVICE_URL}/webhooks/providers/{provider}",
         }
 
-    external_id, error = None, None
-    try:
-        async with httpx.AsyncClient(timeout=settings.SEND_TIMEOUT) as client:
-            resp = await client.post(url, json=payload)
-        if resp.status_code == 202:
-            external_id = resp.json()["external_id"]
-        else:
-            error = "sync_error"
-            logger.warning("provider %s returned %s: %s", provider, resp.status_code, resp.text[:200])
-    except httpx.HTTPError as e:
-        error = "sync_error"
-        logger.warning("provider %s request failed: %r", provider, e)
+    external_id, error = await post_to_provider(provider, url, payload)
 
     async with SessionLocal() as session, session.begin():
         task = await lock_task(session, task_id)
